@@ -1,0 +1,9 @@
+Package: de.greenf0g.doodlesprinthack
+Name: DoodleSprintHack
+Depends: mobilesubstrate
+Version: 0.1
+Architecture: iphoneos-arm
+Description: A hack for Doodle Sprint!
+Maintainer: greenf0g
+Author: greenf0g
+Section: Tweaks
