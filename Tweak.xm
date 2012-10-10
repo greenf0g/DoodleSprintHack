@@ -3,7 +3,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <substrate.h>
+#import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
 @interface GameSceneLayer : NSObject {}
@@ -15,35 +15,75 @@
 - (void)MoveTo:(CGPoint)point level:(int)level;
 @end
 
-static BOOL doubleTap = NO;
-static NSTimer *doubleTapTimer = nil;
+@interface CCDirector : NSObject {}
++ (id)sharedDirector;
+- (id)openGLView;
+@end
 
 static BOOL runMode = NO;
 static NSTimer *runModeTimer = nil;
 
+static UIButton *button = nil;
+
 %hook GameSceneLayer
 
-- (void)ccTouchesBegan:(id)began withEvent:(id)event {
+- (void)hasLoaded:(id)loaded {
     %orig;
     
-    if(doubleTap) {
-        if(runMode) {
-            [runModeTimer invalidate];
-            float &speed = MSHookIvar<float>(self, "mapSpeed");
-            speed = 1.0f;
-        } else {
-            runModeTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(updatePlatform) userInfo:nil repeats:YES];
-        runMode = !runMode;
-        }
-    } else {
-        doubleTapTimer = [NSTimer scheduledTimerWithTimeInterval:0.2 target:self selector:@selector(checkDoubleTap) userInfo:nil repeats:NO];
-        doubleTap = YES;
+    if(button) {
+        [button removeFromSuperview];
+        button = nil;
+    }
+       
+    button = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [button setTitle:@"Run!" forState:UIControlStateNormal];
+    [button setFrame:CGRectMake(-53, 270, 160, 40) ];
+    button.transform = CGAffineTransformMakeRotation(-M_PI/2);
+    [button addTarget:self action:@selector(hackButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
+    [[[(CCDirector *)[%c(CCDirector) sharedDirector] openGLView] window] addSubview:button];
+    
+    [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(timeExpired) userInfo:nil repeats:NO];
+}
+
+- (void)gameOver {
+    %orig;
+    
+    if(button) {
+        [button removeFromSuperview];
+        button = nil;
     }
 }
 
 %new(v@:)
-- (void)checkDoubleTap {
-    doubleTap = NO;
+- (void)timeExpired {
+    if([[[button titleLabel] text] isEqualToString:@"Run!"]) {
+        [button setEnabled:NO];
+        [button setTitle:@"Too late!" forState:UIControlStateDisabled];
+        NSOperationQueue *operation = [[NSOperationQueue alloc] init];
+        [operation addOperationWithBlock:^{
+            sleep(2);
+            [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+                [button removeFromSuperview];
+                button = nil;
+                [operation release];
+            }];
+        }];
+    }
+}
+
+%new(v@:@)
+- (void)hackButtonPressed:(UIButton *)sender {
+    [button setTitle:@"Die!" forState:UIControlStateNormal];
+    if(runMode) {
+        [runModeTimer invalidate];
+        float &speed = MSHookIvar<float>(self, "mapSpeed");
+        speed = 1.0f;
+        [button removeFromSuperview];
+        button = nil;
+    } else {
+        runModeTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(updatePlatform) userInfo:nil repeats:YES];
+    }
+    runMode = !runMode;
 }
 
 %new(v@:)
